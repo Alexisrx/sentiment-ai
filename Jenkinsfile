@@ -1,4 +1,3 @@
-// Jenkinsfile - Pipeline CI/CD SentimentAI
 pipeline {
     agent any
 
@@ -12,20 +11,13 @@ pipeline {
         stage('Checkout') {
             steps {
                 checkout scm
-                echo "Commit : ${env.GIT_COMMIT}"
                 sh 'git log --oneline -5'
             }
         }
 
         stage('Lint') {
             steps {
-                sh '''
-                    docker run --rm \
-                    -v $WORKSPACE:/app \
-                    -w /app \
-                    python:3.12-slim \
-                    sh -c "pip install flake8 -q && flake8 src/ --max-line-length=100"
-                '''
+                sh 'docker run --rm -v $WORKSPACE:/app -w /app python:3.12-slim sh lint.sh'
             }
         }
 
@@ -33,11 +25,6 @@ pipeline {
             steps {
                 sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
                 sh "docker run --rm ${IMAGE_NAME}:${IMAGE_TAG} pytest tests/ -v --cov=src --cov-report=term-missing --cov-fail-under=70"
-            }
-            post {
-                failure {
-                    echo 'Tests échoués ou coverage insuffisant (< 70%)'
-                }
             }
         }
 
@@ -66,10 +53,10 @@ pipeline {
             sh 'docker compose down -v 2>/dev/null || true'
         }
         success {
-            echo "Pipeline réussi ! Image : ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+            echo 'Pipeline reussi !'
         }
         failure {
-            echo 'Pipeline échoué. Consultez les logs ci-dessus.'
+            echo 'Pipeline echoue.'
         }
     }
 }
