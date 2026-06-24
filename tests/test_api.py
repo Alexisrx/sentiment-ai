@@ -23,3 +23,9 @@ def test_predict_empty_fails():
     """Vérifie que Pydantic rejette un texte vide avec une erreur 422."""
     r = client.post("/predict", json={"text": ""})
     assert r.status_code == 422
+
+def test_metrics_endpoint():
+    """Vérifie que l'endpoint /metrics expose les métriques Prometheus."""
+    r = client.get("/metrics")
+    assert r.status_code == 200
+    assert "sentiment_predictions_total" in r.text
