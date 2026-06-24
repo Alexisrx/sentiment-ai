@@ -21,6 +21,16 @@ pipeline {
             }
         }
 
+        stage('IaC Validate') {
+            steps {
+                dir('infra') {
+                    sh 'terraform init -backend=false -input=false'
+                    sh 'terraform fmt -check'
+                    sh 'terraform validate'
+                }
+            }
+        }
+
         stage('Build & Test') {
             steps {
                 sh '''
@@ -106,7 +116,6 @@ pipeline {
             post {
                 failure {
                     echo 'Vulnerabilites CRITICAL ou HIGH detectees !'
-                    echo 'Corrigez les dependances avant de deployer.'
                 }
             }
         }
@@ -130,15 +139,23 @@ pipeline {
             }
         }
 
+        stage('IaC Apply') {
+            when { branch 'main' }
+            steps {
+                dir('infra') {
+                    sh 'terraform init -input=false'
+                    sh """
+                        terraform apply -auto-approve \
+                        -var='image_tag=${IMAGE_TAG}'
+                    """
+                }
+            }
+        }
+
         stage('Deploy Staging') {
             when { branch 'main' }
             steps {
-                echo "Deploiement de ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} en staging..."
-                sh '''
-                    docker compose -f docker-compose.yml -p staging down 2>/dev/null || true
-                    docker compose -f docker-compose.yml -p staging up -d
-                    echo "Staging disponible sur http://localhost:8001"
-                '''
+                sh 'curl -f http://localhost:8001/health || exit 1'
             }
         }
     }
@@ -148,10 +165,10 @@ pipeline {
             sh 'docker compose down -v 2>/dev/null || true'
         }
         success {
-            echo "Pipeline reussi ! Image : ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+            echo "Pipeline OK -- ${IMAGE_TAG} deploye"
         }
         failure {
-            echo 'Pipeline echoue. Consultez les logs ci-dessus.'
+            echo 'Pipeline KO'
         }
     }
 }
